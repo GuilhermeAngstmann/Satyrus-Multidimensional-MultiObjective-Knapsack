@@ -1,0 +1,168 @@
+?prec: 16; # Precision
+?epsilon: 1E-03;
+?alpha: 30;
+
+
+################################
+###### Dados da Instância ######
+################################
+
+# ###### Descrição da Instância ######
+# Capacidade da Mochila: 2 x 2
+# Itens: 3
+# Peso dos Itens:  [4, 2, 1]
+# Valor 1 dos Itens: [20, 9, 7]
+# Valor 2 dos Itens: [11, 17, 6]
+
+#####@Barum adicionar a resposta correta
+
+# ###### Resposta Correta ######
+# Itens selecionados:   Item 2 e Item 3
+# Vetor item[n]:        [0, 1, 1]
+# Blocos selecionados:  Blocos (3, 4, 5) -> Item 2 e (6) -> Item 3
+
+
+################################
+###### Estrutura de Dados ######
+################################
+
+# Capacidade da mochila (cada slot tem peso 1)
+s = 2;
+
+# Número de mochilas
+mochilas = 2;
+
+# Quantidade de itens
+n = 4;
+
+# Quantidade de blocos no conjunto de itens (peso total).
+b = 9;
+
+# Vetor de itens 'n'
+item[mochilas][n];
+
+# Correspondência: se o slot 's' da mochila é ocupado pelo bloco 'b'
+x[mochilas][s][b];
+
+# Matriz item-bloco (Itens 'n' são compostos pelos blocos 'b')
+item_block[n][b] = {
+  (1,1) : 1,
+  (1,2) : 1,
+  (1,3) : 1,
+  (1,4) : 1,
+  (1,5) : 0,
+  (1,6) : 0,
+  (1,7) : 0,
+  (1,8) : 0,
+  (1,9) : 0,
+
+  (2,1) : 0,
+  (2,2) : 0,
+  (2,3) : 0,
+  (2,4) : 0,
+  (2,5) : 1,
+  (2,6) : 1,
+  (2,7) : 0,
+  (2,8) : 0,
+  (2,9) : 0,
+
+  (3,1) : 0,
+  (3,2) : 0,
+  (3,3) : 0,
+  (3,4) : 0,
+  (3,5) : 0,
+  (3,6) : 0,
+  (3,7) : 1,
+  (3,8) : 0,
+  (3,9) : 0,
+
+  (4,1) : 0,
+  (4,2) : 0,
+  (4,3) : 0,
+  (4,4) : 0,
+  (4,5) : 0,
+  (4,6) : 0,
+  (4,7) : 0,
+  (4,8) : 1,
+  (4,9) : 1
+};
+
+# Vetor de valor para a métrica dos itens (NOTA: Soma dos valores precisa ser igual a 1)
+value1[n] = {
+  (1) : 9/41,
+  (2) : 20/41,
+  (3) : 7/41,
+  (4) : 5/41
+};
+
+# Vetor de valor para a métrica 2 dos itens(NOTA: Soma dos valores precisa ser igual a 1)
+value2[n] = {
+  (1) : 11/36,
+  (2) : 17/36,
+  (3) : 6/36,
+  (4) : 2/36
+
+};
+
+########################
+###### Restrições ######
+########################
+
+# Níveis de Penalidade
+LOW = 1;
+HIGH = 2;
+VERY_HIGH = 4;
+
+# Bias: Selecionar todos os blocos
+(int) select_all_blocks[LOW]:
+    forall{a = [1:mochilas]}
+    forall{i = [1:s]}
+    forall{k = [1:b]}
+    x[a][i][k];
+
+# WTA: Se um bloco 'k' ocupa o slot 'i' então outro bloco 'l' não pode ocupar o mesmo slot 'i' 
+# Se um bloco está na mochila 'a' ela não pode estar na mochila 'b'
+(int) one_block_per_slot[HIGH]:
+    forall{a = [1:mochilas]}
+    forall{i = [1:s]}
+    forall{k = [1:b]}
+    forall{l = [1:b], l != k}
+    not(x[a][i][k] and x[a][i][l]);
+
+# WTA: Se um item está na mochila a ele não pode estar na mochila c
+(int) one_item_per_pack[HIGH]:
+    forall{a = [1:mochilas]}
+    forall{c = [1:mochilas], c != a}
+    forall{i = [1:n]}
+    not(item[a][i] and item[c][i]);
+
+# WTA: Se um bloco 'k' ocupa o slot 'i' então o mesmo bloco 'k' não pode ocupar outro slot 'j'
+(int) one_slot_per_block[HIGH]: # WTA
+    forall{a = [1:mochilas]}
+    forall{k = [1:b]}
+    forall{i = [1:s]}
+    forall{j = [1:s], j != i}
+    not(x[a][i][k] and x[a][j][k]);
+
+
+# Acoplamento: Se um bloco 'k' ocupa algum slot 'i' e é parte de um item 'm', então o item 'm' é escolhido
+(int) block_item_coupling[HIGH]:
+    forall{a = [1:mochilas]}
+    forall{m = [1:n]}
+    forall{i = [1:s]}
+    forall{k = [1:b]}
+    (x[a][i][k] and item_block[m][k]) -> item[a][m];
+
+# Acoplamento: Se um item 'm' é escolhido e é composto por um algum bloco 'k', então o bloco 'k' tem que ser escolhido
+(int) item_block_coupling[LOW]:
+    forall{a = [1:mochilas]}
+    forall{m = [1:n]}
+    forall{k = [1:b]}
+    forall{i = [1:s]}
+    (item[a][m] and item_block[m][k]) -> x[a][i][k];
+
+# Otimalidade (Maximizar soma do valor dos itens escolhidos)
+(opt) cost:
+    exists{a = [1:mochilas]}
+    exists{i = [1:n]}
+    item[a][i] * (value1[i] * value2[i])*-1;
