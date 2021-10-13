@@ -1,0 +1,84 @@
+!using model_01
+model Multiplas_Mochilas_Inteiras_01
+
+uses "mmxprs";							!acesso ao solver do Xpress-Optimizer
+uses "mmsystem"							!acesso a funcoes de sistema, como gettime
+
+declarations
+	!ranges e constantes
+	N = 1..4							!itens
+	M = 1..2							!mochilas
+	!Vetores de entrada
+	p: array(N) of integer				!valor 1 de cada item
+    q: array(N) of integer				!valor 2 de cada item
+	w: array(N) of integer				!peso (weight) de cada item
+	u: array(N) of integer				!quantidade disponiel de cada item
+	b: array(M) of integer				!capacidade de cada mochila
+	!variaveis de decisao
+	x: array(M,N) of mpvar				!x(i,j) = 1 => item j sera levado na mochila i; 0, caso contraio
+end-declarations
+
+!dados de entrada
+w :: [4, 2, 1, 2]
+p :: [4, 6, 3, 3]
+1 :: [4, 6, 3, 3]
+u :: [1, 1, 1, 1]
+b :: [2, 2]
+
+!funcao objetivo
+MaxVal := sum(i in M, j in N) p(j)*q(j)*x(i,j)
+
+!restricoes de limite de capacidade das mochilas
+forall(i in M) Capac(i):= sum(j in N) w(j)*x(i,j) <= b(i)
+
+!Para cada item j, suas u_j unidades disponiveis podem ocupar no maximo u_j mochilas
+forall(j in N) Pert(j):= sum(i in M) x(i,j) <= u(j)
+
+!As variaveis de decisao sao inteiras
+forall(i in M,j in N) x(i,j) is_integer
+
+!optimizing parameters
+setparam("XPRS_VERBOSE",true)		!faz com que a otimizacao va sendo escrita na tela
+
+!resolver o subproblema
+starttime := gettime
+maximize(MaxVal)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Impressao dos resultados da otimizacao do modelo !
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+case getprobstat of
+ XPRS_OPT: status:="Optimum found"
+ XPRS_UNF: status:="Unfinished"
+ XPRS_INF: status:="Infeasible"
+ XPRS_UNB: status:="Unbounded"
+ XPRS_OTH: status:="Failed"
+ else status:="???"
+end-case
+writeln("")
+writeln("\n--------- --- ---------- -- ---------- -- ------")
+writeln("Impressao dos resultados da otimizacao do modelo")
+writeln("--------- --- ---------- -- ---------- -- ------")
+writeln("\nProblem status: ", status)
+writeln("\nFuncao Objetivo = ", getobjval)
+writeln("\nTempo de CPU (em segundos) = ",gettime-starttime)
+forall(i in M) do
+	writeln("\nItens levados integralmente na mochila ", i,", de capacidade = ",b(i))
+	writeln("Item     x*(i)           peso    valor")
+	totp := 0.000000
+	totv := 0.000000
+	forall(j in N) do
+		iaux := x(i,j).sol
+		if (iaux > 0.000001) then
+			peso := iaux*w(j)
+			valor := iaux*p(j)
+            valor2 := iaux*q(j)
+			writeln("  ",strfmt(j,2),"       ",strfmt(iaux,3),"            ",strfmt(peso,3),"      ",strfmt(valor,3))
+			totp += peso
+			totv += valor
+		end-if
+	end-do
+	writeln("Total para a mochila ",i,":   ",strfmt(totp,3),"      ",strfmt(totv,3))
+end-do
+
+end-model
